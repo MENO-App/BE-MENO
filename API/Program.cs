@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Infrastructure.Persistence;
 using Application.Common.Interfaces;
 using Application.Features.Users.Commands;
+using Domain.Entities;
+
 
 namespace API
 {
@@ -25,12 +27,35 @@ namespace API
 
             var app = builder.Build();
 
+           
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+
+                // seed: make a default school if there isnt any
+                if (!db.Schools.Any())
+                {
+                    db.Schools.Add(new School
+                    {
+                        SchoolId = Guid.NewGuid(),
+                        Name = "Default School",
+                        Timezone = "Europe/Stockholm"
+                    });
+
+                    db.SaveChanges();
+                }
+            }
+
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+
             app.MapPost("/users", async (IApplicationDBContext db, CreateUser.Request request, CancellationToken ct) =>
 
             {
@@ -42,6 +67,13 @@ namespace API
             });
 
             app.UseHttpsRedirection();
+
+            app.MapGet("/schools/default", async (ApplicationDbContext db) =>
+            {
+                var school = await db.Schools.FirstAsync();
+                return Results.Ok(new { school.SchoolId, school.Name, school.Timezone });
+            });
+
 
             app.UseAuthorization();
 
