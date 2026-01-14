@@ -1,3 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using Infrastructure.Persistence;
+using Application.Common.Interfaces;
+using Application.Features.Users.Commands;
 
 namespace API
 {
@@ -7,6 +11,11 @@ namespace API
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            builder.Services.AddScoped<IApplicationDBContext>(sp =>
+            sp.GetRequiredService<ApplicationDbContext>());
             // Add services to the container.
 
             builder.Services.AddControllers();
@@ -22,6 +31,15 @@ namespace API
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            app.MapPost("/users", async (IApplicationDBContext db, CreateUser.Request request, CancellationToken ct) =>
+
+            {
+
+                var result = await CreateUser.Handle(db, request, ct);
+
+                return Results.Created($"/users/{result.UserId}", result);
+
+            });
 
             app.UseHttpsRedirection();
 
