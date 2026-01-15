@@ -56,27 +56,9 @@ namespace API
                 app.UseSwaggerUI();
             }
 
-            app.MapPost("/users", async (IApplicationDBContext db, CreateUser.Request request, CancellationToken ct) =>
-
-            {
-
-                var result = await CreateUser.Handle(db, request, ct);
-
-                return Results.Created($"/users/{result.UserId}", result);
-
-            });
-
             app.UseHttpsRedirection();
 
-            app.MapGet("/schools/default", async (ApplicationDbContext db) =>
-            {
-                var school = await db.Schools.FirstAsync();
-                return Results.Ok(new { school.SchoolId, school.Name, school.Timezone });
-            });
-
-
             app.UseAuthorization();
-
 
             app.MapControllers();
 
