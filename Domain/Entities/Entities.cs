@@ -58,7 +58,7 @@ namespace Domain.Entities
 
         public int Year { get; set; }
         public int WeekNumber { get; set; }
-        public DateTime PublishedAt { get; set; }
+        public DateTime? PublishedAt { get; set; }
 
         public School? School { get; set; }
         public ICollection<MenuItem> MenuItems { get; set; } = new List<MenuItem>();
@@ -68,6 +68,9 @@ namespace Domain.Entities
     {
         public Guid MenuItemId { get; set; }
         public Guid MenuWeekId { get; set; }
+
+        // 1 = Monday, 7 = Sunday (ISO-8601)
+        public int DayOfWeek { get; set; }
 
         public MenuItemType Type { get; set; }
         public string Title { get; set; } = string.Empty;
