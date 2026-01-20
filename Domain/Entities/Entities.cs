@@ -96,6 +96,11 @@ namespace Domain.Entities
         public MealChoiceStatus Status { get; set; }
         public bool WantsVegetarian { get; set; }
 
-        public User? User { get; set; }
+        // public User? User { get; set; }
+
+        // IMPORTANT:
+        // Authentication users are handled by ASP.NET Identity (ApplicationUser).
+        // Domain entities must not reference Identity users directly.
+        // Ownership is handled via UserId only.
     }
 }

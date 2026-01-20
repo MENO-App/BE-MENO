@@ -1,69 +1,172 @@
-using Microsoft.EntityFrameworkCore;
-using Infrastructure.Persistence;
+using System.Text;
 using Application.Common.Interfaces;
-using Application.Features.Users.Commands;
 using Domain.Entities;
+using Infrastructure.Auth;
+using Infrastructure.Data;
+using Infrastructure.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
+namespace API;
 
-namespace API
+public class Program
 {
-    public class Program
+    public static async Task Main(string[] args)
     {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+        var builder = WebApplication.CreateBuilder(args);
 
-            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        // -------------------------
+        // Database + Application DB abstraction
+        // -------------------------
+        builder.Services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-            builder.Services.AddScoped<IApplicationDBContext>(sp =>
+        builder.Services.AddScoped<IApplicationDBContext>(sp =>
             sp.GetRequiredService<ApplicationDbContext>());
-            // Add services to the container.
 
-            builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+        // -------------------------
+        // Identity (users + roles)
+        // -------------------------
+        builder.Services.AddIdentity<ApplicationUser, ApplicationRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
 
-            var app = builder.Build();
-
-           
-
-            using (var scope = app.Services.CreateScope())
+        // -------------------------
+        // JWT Authentication
+        // -------------------------
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
             {
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var jwtSection = builder.Configuration.GetSection("Jwt");
+                var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
 
-
-                // seed: make a default school if there isnt any
-                if (!db.Schools.Any())
+                options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    db.Schools.Add(new School
-                    {
-                        SchoolId = Guid.NewGuid(),
-                        Name = "Default School",
-                        Timezone = "Europe/Stockholm"
-                    });
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSection["Issuer"],
+                    ValidAudience = jwtSection["Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                };
+            });
 
-                    db.SaveChanges();
-                }
-            }
+        // -------------------------
+        // Authorization (policies)
+        // -------------------------
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy("AdminOnly", policy => policy.RequireRole("ADMIN"));
+            options.AddPolicy("KitchenOnly", policy => policy.RequireRole("KITCHEN"));
+            options.AddPolicy("StudentOrStaff", policy => policy.RequireRole("STUDENT", "STAFF"));
+        });
 
+        // -------------------------
+        // Application services
+        // -------------------------
+        builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+        // -------------------------
+        // Controllers + Swagger
+        // -------------------------
+        builder.Services.AddControllers();
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen(options =>
+        {
+            // Swagger "Authorize" button for Bearer JWT
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
-                app.UseSwagger();
-                app.UseSwaggerUI();
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "Enter: Bearer {your JWT token}"
+            });
+
+            options.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer"
+                        }
+                    },
+                    Array.Empty<string>()
+                }
+            });
+        });
+
+        var app = builder.Build();
+
+        // -------------------------
+        // Seed data (roles + initial admin + default school)
+        // -------------------------
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            // 1) Seed roles
+            var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+            await IdentitySeeder.SeedRolesAsync(roleManager);
+
+            // 2) Seed initial admin (from appsettings.json -> InitialAdmin)
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+            var adminSection = builder.Configuration.GetSection("InitialAdmin");
+            var adminEmail = adminSection["Email"];
+            var adminPassword = adminSection["Password"];
+
+            if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+            {
+                await IdentitySeeder.SeedInitialAdminAsync(
+                    userManager,
+                    roleManager,
+                    adminEmail,
+                    adminPassword
+                );
             }
 
+            // 3) Seed default school
+            if (!db.Schools.Any())
+            {
+                db.Schools.Add(new School
+                {
+                    SchoolId = Guid.NewGuid(),
+                    Name = "Default School",
+                    Timezone = "Europe/Stockholm"
+                });
 
-            app.UseHttpsRedirection();
-
-            app.UseAuthorization();
-
-            app.MapControllers();
-
-            app.Run();
+                db.SaveChanges();
+            }
         }
+
+
+        // -------------------------
+        // HTTP pipeline
+        // -------------------------
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+
+        app.UseHttpsRedirection();
+
+        // IMPORTANT ORDER:
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        app.MapControllers();
+
+        app.Run();
     }
 }
