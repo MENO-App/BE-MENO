@@ -2,6 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using Application.Common.Interfaces;
 using Domain.Entities;
+using Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+
 
 namespace API.Controllers;
 
@@ -9,11 +12,15 @@ namespace API.Controllers;
 public class UserAllergiesController : ControllerBase
 {
     private readonly IApplicationDBContext _db;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public UserAllergiesController(IApplicationDBContext db)
+
+    public UserAllergiesController(IApplicationDBContext db, UserManager<ApplicationUser> userManager)
     {
         _db = db;
+        _userManager = userManager;
     }
+
 
     // POST /users/{id}/allergies
     // Adds a link between a user and an allergy.
@@ -22,7 +29,7 @@ public class UserAllergiesController : ControllerBase
     public async Task<IActionResult> AddAllergy(
         [FromRoute] Guid id,
         [FromBody] AddUserAllergyRequest request,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
@@ -30,16 +37,16 @@ public class UserAllergiesController : ControllerBase
         if (request.AllergyId == Guid.Empty)
             return BadRequest(new { message = "AllergyId is required." });
 
-        bool userExists = await _db.Users.AnyAsync(userEntity => userEntity.UserId == id, ct);
+        bool userExists = await _userManager.Users.AnyAsync(u => u.Id == id, cancellationToken);
         if (!userExists)
             return NotFound(new { message = "User not found." });
 
-        bool allergyExists = await _db.Allergies.AnyAsync(allergyEntity => allergyEntity.AllergyId == request.AllergyId, ct);
+        bool allergyExists = await _db.Allergies.AnyAsync(allergyEntity => allergyEntity.AllergyId == request.AllergyId, cancellationToken);
         if (!allergyExists)
             return NotFound(new { message = "Allergy not found." });
 
         bool linkExists = await _db.UserAllergies.AnyAsync(linkEntity =>
-            linkEntity.UserId == id && linkEntity.AllergyId == request.AllergyId, ct);
+            linkEntity.UserId == id && linkEntity.AllergyId == request.AllergyId, cancellationToken);
 
         if (linkExists)
             return Conflict(new { message = "User already has this allergy." });
@@ -52,7 +59,7 @@ public class UserAllergiesController : ControllerBase
         };
 
         _db.UserAllergies.Add(newLink);
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }
@@ -64,24 +71,24 @@ public class UserAllergiesController : ControllerBase
     public async Task<IActionResult> RemoveAllergy(
         [FromRoute] Guid id,
         [FromRoute] Guid allergyId,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
-        bool userExists = await _db.Users.AnyAsync(userEntity => userEntity.UserId == id, ct);
+        bool userExists = await _userManager.Users.AnyAsync(u => u.Id == id, cancellationToken);
         if (!userExists)
             return NotFound(new { message = "User not found." });
 
-        bool allergyExists = await _db.Allergies.AnyAsync(allergyEntity => allergyEntity.AllergyId == allergyId, ct);
+        bool allergyExists = await _db.Allergies.AnyAsync(allergyEntity => allergyEntity.AllergyId == allergyId, cancellationToken);
         if (!allergyExists)
             return NotFound(new { message = "Allergy not found." });
 
         var link = await _db.UserAllergies
-            .FirstOrDefaultAsync(linkEntity => linkEntity.UserId == id && linkEntity.AllergyId == allergyId, ct);
+            .FirstOrDefaultAsync(linkEntity => linkEntity.UserId == id && linkEntity.AllergyId == allergyId, cancellationToken);
 
         if (link is null)
             return NotFound(new { message = "User does not have this allergy." });
 
         _db.UserAllergies.Remove(link);
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return NoContent();
     }
@@ -92,9 +99,9 @@ public class UserAllergiesController : ControllerBase
     [Route("users/{id:guid}/allergies")]
     public async Task<IActionResult> GetAllergies(
         [FromRoute] Guid id,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
-        bool userExists = await _db.Users.AnyAsync(userEntity => userEntity.UserId == id, ct);
+        bool userExists = await _userManager.Users.AnyAsync(u => u.Id == id, cancellationToken);
         if (!userExists)
             return NotFound(new { message = "User not found." });
 
@@ -110,7 +117,7 @@ public class UserAllergiesController : ControllerBase
                     linkEntity.Notes
                 })
             .OrderBy(result => result.Name)
-            .ToListAsync(ct);
+            .ToListAsync(cancellationToken);
 
         return Ok(allergies);
     }
