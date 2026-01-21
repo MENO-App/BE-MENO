@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace API.Controllers;
 
 [ApiController]
-[Route("admin")]
 [Authorize(Policy = "AdminOnly")]
+[Route("admin/users")]
 public class AdminController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -22,11 +22,12 @@ public class AdminController : ControllerBase
         _roleManager = roleManager;
     }
 
-    [HttpGet("users")]
+    // GET /admin/users
+    [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
-        // Simple list to help admins pick correct IDs in Swagger
         var users = await _userManager.Users
+            .AsNoTracking()
             .OrderBy(u => u.Email)
             .Select(u => new
             {
@@ -38,28 +39,61 @@ public class AdminController : ControllerBase
         return Ok(users);
     }
 
-    // POST /admin/users/{userId}/roles/{role}
-    // Adds a role to a user (ADMIN only).
-    [HttpPost("users/{userId:guid}/roles/{role}")]
-    public async Task<IActionResult> AddRoleToUser([FromRoute] Guid userId, [FromRoute] string role)
+    // GET /admin/users/{userId}/roles
+    [HttpGet("{userId:guid}/roles")]
+    public async Task<IActionResult> GetUserRoles([FromRoute] Guid userId)
     {
-        role = role.Trim().ToUpperInvariant();
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return NotFound(new { message = "User not found." });
 
-        // Ensure role exists
-        var roleExists = await _roleManager.RoleExistsAsync(role);
-        if (!roleExists)
+        var roles = await _userManager.GetRolesAsync(user);
+        return Ok(roles);
+    }
+
+    // POST /admin/users/{userId}/roles/{role}
+    [HttpPost("{userId:guid}/roles/{role}")]
+    public async Task<IActionResult> AddRole([FromRoute] Guid userId, [FromRoute] string role)
+    {
+        role = (role ?? "").Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(role))
+            return BadRequest(new { message = "Role is required." });
+
+        if (!await _roleManager.RoleExistsAsync(role))
             return BadRequest(new { message = $"Role '{role}' does not exist." });
 
-        // Find user
         var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user is null)
-            return NotFound(new { message = "User not found." });
+        if (user is null) return NotFound(new { message = "User not found." });
 
-        // Add role if not already assigned
         if (await _userManager.IsInRoleAsync(user, role))
             return NoContent();
 
         var result = await _userManager.AddToRoleAsync(user, role);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return NoContent();
+    }
+
+    // DELETE /admin/users/{userId}/roles/{role}
+    [HttpDelete("{userId:guid}/roles/{role}")]
+    public async Task<IActionResult> RemoveRole([FromRoute] Guid userId, [FromRoute] string role)
+    {
+        role = (role ?? "").Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(role))
+            return BadRequest(new { message = "Role is required." });
+
+        if (!await _roleManager.RoleExistsAsync(role))
+            return BadRequest(new { message = $"Role '{role}' does not exist." });
+
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return NotFound(new { message = "User not found." });
+
+        if (!await _userManager.IsInRoleAsync(user, role))
+            return NoContent();
+
+        var result = await _userManager.RemoveFromRoleAsync(user, role);
         if (!result.Succeeded)
             return BadRequest(result.Errors);
 
