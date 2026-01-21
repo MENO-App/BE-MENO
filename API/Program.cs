@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Application.Common.Interfaces;
 using Domain.Entities;
@@ -21,7 +22,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // -------------------------
-        // Database + Application DB abstraction
+        // Database
         // -------------------------
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -30,36 +31,54 @@ public class Program
             sp.GetRequiredService<ApplicationDbContext>());
 
         // -------------------------
-        // Identity (users + roles)
+        // Identity
         // -------------------------
         builder.Services.AddIdentity<ApplicationUser, ApplicationRole>()
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
-        // -------------------------
-        // JWT Authentication
-        // -------------------------
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        // Prevent cookie redirect (Swagger/clients should get 401 instead of redirect to /Account/Login)
+        builder.Services.ConfigureApplicationCookie(options =>
+        {
+            options.Events.OnRedirectToLogin = ctx =>
             {
-                var jwtSection = builder.Configuration.GetSection("Jwt");
-                var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
-
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSection["Issuer"],
-                    ValidAudience = jwtSection["Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ClockSkew = TimeSpan.FromMinutes(1)
-                };
-            });
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            };
+        });
 
         // -------------------------
-        // Authorization (policies)
+        // AuthN (JWT)
+        // -------------------------
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            var jwt = builder.Configuration.GetSection("Jwt");
+            var key = Encoding.UTF8.GetBytes(jwt["Key"]!);
+
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                ValidIssuer = jwt["Issuer"],
+                ValidAudience = jwt["Audience"],
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+
+                RoleClaimType = ClaimTypes.Role,
+                NameClaimType = ClaimTypes.NameIdentifier,
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
+        });
+
+        // -------------------------
+        // AuthZ (policies)
         // -------------------------
         builder.Services.AddAuthorization(options =>
         {
@@ -69,7 +88,7 @@ public class Program
         });
 
         // -------------------------
-        // Application services
+        // App services
         // -------------------------
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
@@ -87,7 +106,6 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {
-            // Swagger "Authorize" button for Bearer JWT
             options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Name = "Authorization",
@@ -116,19 +134,22 @@ public class Program
 
         var app = builder.Build();
 
+        // (Optional but recommended) Force known URLs to avoid "Failed to determine the https port..."
+        // If you only want HTTPS, keep only https line.
+        app.Urls.Clear();
+        app.Urls.Add("https://localhost:7292");
+        app.Urls.Add("http://localhost:5169");
+
         // -------------------------
-        // Seed data (roles + initial admin + default school)
+        // Seed data
         // -------------------------
-        using (var scope = app.Services.CreateScope())
+        await using (var scope = app.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-            // 1) Seed roles
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
-            await IdentitySeeder.SeedRolesAsync(roleManager);
-
-            // 2) Seed initial admin (from appsettings.json -> InitialAdmin)
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+            await IdentitySeeder.SeedRolesAsync(roleManager);
 
             var adminSection = builder.Configuration.GetSection("InitialAdmin");
             var adminEmail = adminSection["Email"];
@@ -144,8 +165,7 @@ public class Program
                 );
             }
 
-            // 3) Seed default school
-            if (!db.Schools.Any())
+            if (!await db.Schools.AnyAsync())
             {
                 db.Schools.Add(new School
                 {
@@ -154,10 +174,9 @@ public class Program
                     Timezone = "Europe/Stockholm"
                 });
 
-                db.SaveChanges();
+                await db.SaveChangesAsync();
             }
         }
-
 
         // -------------------------
         // HTTP pipeline
@@ -170,7 +189,6 @@ public class Program
 
         app.UseHttpsRedirection();
 
-        // IMPORTANT ORDER:
         app.UseAuthentication();
         app.UseAuthorization();
 
