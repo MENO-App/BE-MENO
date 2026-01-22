@@ -3,10 +3,15 @@ using System.Text;
 using Application.Common.Interfaces;
 using Application.Interfaces;
 using Domain.Entities;
+using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Identity;
+
 using Infrastructure.Repositories;
+
+using MediatR;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -107,6 +112,13 @@ public class Program
         // -------------------------
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
+        // -------------------------
+        // MediatR + FluentValidation + pipeline behavior
+        // -------------------------
+        builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Application.Common.Result).Assembly));
+        builder.Services.AddValidatorsFromAssembly(typeof(Application.Common.Result).Assembly);
+
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Application.Common.ValidationBehavior<,>));
         // -------------------------
         // Controllers + Swagger
         // -------------------------

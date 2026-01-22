@@ -19,6 +19,7 @@ namespace Infrastructure.Data
         public DbSet<Domain.Entities.User> DomainUsers { get; set; } = default!;
 
         public DbSet<School> Schools => Set<School>();
+        public DbSet<User> Users => Set<User>();
         public DbSet<Allergy> Allergies => Set<Allergy>();
         public DbSet<UserAllergy> UserAllergies => Set<UserAllergy>();
 
