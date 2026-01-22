@@ -5,6 +5,8 @@ using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using System;
 
+
+
 namespace Infrastructure.Data
 {
     public class ApplicationDbContext
@@ -14,9 +16,12 @@ namespace Infrastructure.Data
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }
 
+        public DbSet<Domain.Entities.User> DomainUsers { get; set; } = default!;
+
         public DbSet<School> Schools => Set<School>();
         public DbSet<Allergy> Allergies => Set<Allergy>();
         public DbSet<UserAllergy> UserAllergies => Set<UserAllergy>();
+
 
         public DbSet<MenuWeek> MenuWeeks => Set<MenuWeek>();
         public DbSet<MenuItem> MenuItems => Set<MenuItem>();
@@ -38,11 +43,13 @@ namespace Infrastructure.Data
             modelBuilder.Entity<MenuItemAllergen>()
                 .HasKey(x => new { x.MenuItemId, x.AllergenCode });
 
+            modelBuilder.Entity<Domain.Entities.User>().ToTable("User");
+
             // Relation: School 1..* Users
-           // modelBuilder.Entity<User>()
-             //   .HasOne(x => x.School)
-             //   .WithMany(x => x.Users)
-               // .HasForeignKey(x => x.SchoolId);
+            // modelBuilder.Entity<User>()
+            //   .HasOne(x => x.School)
+            //   .WithMany(x => x.Users)
+            // .HasForeignKey(x => x.SchoolId);
 
             // Relation: School 1..* MenuWeeks
             modelBuilder.Entity<MenuWeek>()

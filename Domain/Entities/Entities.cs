@@ -20,6 +20,7 @@ namespace Domain.Entities
     public sealed class User
     {
         public Guid UserId { get; set; }
+        public string IdentityUserId { get; set; } = default!;
         public Guid SchoolId { get; set; }
         public Role Role { get; set; }
 
