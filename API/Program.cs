@@ -1,12 +1,17 @@
 using System.Security.Claims;
 using System.Text;
 using Application.Common.Interfaces;
+using Application.Interfaces;
 using Domain.Entities;
 using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Identity;
+
+using Infrastructure.Repositories;
+
 using MediatR;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +31,7 @@ public class Program
             options.AddPolicy("AllowFrontend", policy =>
             {
                 policy
-                    .WithOrigins(
-                        "http://localhost:5173",
-                        "http://localhost:3000",
-                        "http://localhost:8080"
-                    )
+                    .WithOrigins("http://localhost:5173", "http://localhost:3000")
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
@@ -52,6 +53,9 @@ public class Program
         builder.Services.AddIdentity<ApplicationUser, ApplicationRole>()
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
+
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
+
 
         // Prevent cookie redirect (Swagger/clients should get 401 instead of redirect to /Account/Login)
         builder.Services.ConfigureApplicationCookie(options =>
