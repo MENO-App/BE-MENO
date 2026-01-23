@@ -26,7 +26,11 @@ public class Program
             options.AddPolicy("AllowFrontend", policy =>
             {
                 policy
-                    .WithOrigins("http://localhost:5173", "http://localhost:3000")
+                    .WithOrigins(
+                        "http://localhost:5173",
+                        "http://localhost:3000",
+                        "http://localhost:8080"
+                    )
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
@@ -200,7 +204,7 @@ public class Program
         }
 
         app.UseHttpsRedirection();
-
+        app.UseRouting();
         app.UseCors("AllowFrontend");
 
         app.UseAuthentication();
