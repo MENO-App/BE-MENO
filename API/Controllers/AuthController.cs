@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Application.Common.Interfaces;
 using Microsoft.AspNetCore.Identity.Data;
+using Application.Common;
+using Azure.Core;
+using Domain.Entities;
 
 
 namespace API.Controllers;
@@ -37,7 +40,8 @@ public class AuthController : ControllerBase
         var result = await _userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
             return BadRequest(result.Errors);
-
+        // Tilldela default-roll
+        await _userManager.AddToRoleAsync(user, "STUDENT");
         return Created($"/users/{user.Id}", new { UserId = user.Id, user.Email });
     }
 
