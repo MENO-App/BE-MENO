@@ -2,11 +2,14 @@
 using Application.Common.Interfaces;
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+
 
 namespace API.Controllers;
 
 [ApiController]
-public class AllergiesController : ControllerBase
+[Route("allergies")]
+public sealed class AllergiesController : ControllerBase
 {
     private readonly IApplicationDBContext _db;
 
@@ -17,8 +20,9 @@ public class AllergiesController : ControllerBase
 
     // POST /allergies
     [HttpPost]
-    [Route("allergies")]
+    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> Create([FromBody] CreateAllergyRequest request, CancellationToken ct)
+
     {
         var allergy = new Allergy
         {
@@ -34,16 +38,17 @@ public class AllergiesController : ControllerBase
 
     // GET /allergies
     [HttpGet]
-    [Route("allergies")]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
         var items = await _db.Allergies
+            .AsNoTracking()
             .OrderBy(a => a.Name)
             .Select(a => new { a.AllergyId, a.Name })
             .ToListAsync(ct);
 
         return Ok(items);
     }
+
 
     public sealed record CreateAllergyRequest(string Name);
 }

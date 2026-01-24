@@ -4,6 +4,8 @@ using Application.Common.Interfaces;
 using Domain.Entities;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
+using Application.Users.Allergies.Dtos;
+
 
 
 namespace API.Controllers;
@@ -121,7 +123,4 @@ public class UserAllergiesController : ControllerBase
 
         return Ok(allergies);
     }
-
-    // Request body for POST /users/{id}/allergies
-    public sealed record AddUserAllergyRequest(Guid AllergyId, string? Notes);
 }
