@@ -4,6 +4,7 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260124104218_SeedAllergies")]
+    partial class SeedAllergies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -61,27 +64,27 @@ namespace Infrastructure.Migrations
                         new
                         {
                             AllergyId = new Guid("55555555-5555-5555-5555-555555555555"),
-                            Name = "Fisk"
-                        },
-                        new
-                        {
-                            AllergyId = new Guid("66666666-6666-6666-6666-666666666666"),
-                            Name = "Skaldjur"
-                        },
-                        new
-                        {
-                            AllergyId = new Guid("77777777-7777-7777-7777-777777777777"),
-                            Name = "Jordnötter"
-                        },
-                        new
-                        {
-                            AllergyId = new Guid("88888888-8888-8888-8888-888888888888"),
                             Name = "Nötter"
                         },
                         new
                         {
-                            AllergyId = new Guid("99999999-9999-9999-9999-999999999999"),
+                            AllergyId = new Guid("66666666-6666-6666-6666-666666666666"),
+                            Name = "Jordnötter"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("77777777-7777-7777-7777-777777777777"),
                             Name = "Soja"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("88888888-8888-8888-8888-888888888888"),
+                            Name = "Fisk"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("99999999-9999-9999-9999-999999999999"),
+                            Name = "Skaldjur"
                         },
                         new
                         {
@@ -91,12 +94,7 @@ namespace Infrastructure.Migrations
                         new
                         {
                             AllergyId = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
-                            Name = "Selleri"
-                        },
-                        new
-                        {
-                            AllergyId = new Guid("cccccccc-cccc-cccc-cccc-cccccccccccc"),
-                            Name = "Senap"
+                            Name = "Annan"
                         });
                 });
 

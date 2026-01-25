@@ -1,31 +1,48 @@
-name: Backend CI
-
+name: Backend CI/CD
+ 
 on:
-  pull_request:
-    branches: ["main"]
   push:
-    branches: ["main"]
-
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+ 
 env:
   DOTNET_VERSION: "8.0.x"
-
+ 
 jobs:
-  build_test:
+  build_test_deploy:
     runs-on: ubuntu-latest
+ 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+ 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
+ 
       - name: Restore
-        run: dotnet restore
-
+        run: dotnet restore MENO.sln
+ 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
-
+        run: dotnet build MENO.sln --configuration Release --no-restore
+ 
       - name: Test
-        run: dotnet test --configuration Release --no-build
+        run: dotnet test MENO.sln --configuration Release --no-build --verbosity normal
+ 
+      - name: Publish
+        run: dotnet publish API/API.csproj -c Release -o ./publish
+ 
+      # 🔐 Login to Azure using Service Principal
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+ 
+      # 🚀 Deploy to Azure App Service
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: Meno
+          package: ./publish
