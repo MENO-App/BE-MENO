@@ -2,7 +2,9 @@
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Data;
+using Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -20,17 +22,19 @@ public sealed class CurrentUserController : ControllerBase
     private readonly IUserRepository _userRepository;
     private readonly IConfiguration _config;
     private readonly ApplicationDbContext _db;
-
+    private readonly UserManager<ApplicationUser> _userManager;
 
 
     public CurrentUserController(
      IUserRepository userRepository,
      IConfiguration config,
-     ApplicationDbContext db)
+     ApplicationDbContext db,
+     UserManager<ApplicationUser> userManager)
     {
         _userRepository = userRepository;
         _config = config;
         _db = db;
+        _userManager = userManager;
     }
 
 
@@ -135,6 +139,69 @@ public sealed class CurrentUserController : ControllerBase
     }
 
     // =========================
+    // PUT /users/me/email
+    // Updates the current user's email.
+    // =========================
+    public sealed record UpdateEmailDto(string Email);
+
+    [HttpPut("email")]
+    public async Task<IActionResult> UpdateEmail([FromBody] UpdateEmailDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            return BadRequest(new { message = "Email is required." });
+
+        var identityUserId =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (string.IsNullOrWhiteSpace(identityUserId))
+            return Unauthorized();
+
+        var identityUser = await _userManager.FindByIdAsync(identityUserId);
+        if (identityUser is null)
+            return NotFound();
+
+        identityUser.Email = dto.Email.Trim();
+        identityUser.UserName = dto.Email.Trim();
+
+        var result = await _userManager.UpdateAsync(identityUser);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return NoContent();
+    }
+
+    // =========================
+    // POST /users/me/change-password
+    // Changes the current user's password.
+    // =========================
+    public sealed record ChangePasswordDto(string CurrentPassword, string NewPassword);
+
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.CurrentPassword) || string.IsNullOrWhiteSpace(dto.NewPassword))
+            return BadRequest(new { message = "Current and new password are required." });
+
+        var identityUserId =
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+
+        if (string.IsNullOrWhiteSpace(identityUserId))
+            return Unauthorized();
+
+        var identityUser = await _userManager.FindByIdAsync(identityUserId);
+        if (identityUser is null)
+            return NotFound();
+
+        var result = await _userManager.ChangePasswordAsync(identityUser, dto.CurrentPassword, dto.NewPassword);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return NoContent();
+    }
+
+    // =========================
     // GET /users/me/allergies
     // Returns all allergy IDs for the current user.
     // =========================
@@ -214,11 +281,16 @@ public sealed class CurrentUserController : ControllerBase
         if (!allergyExists)
             return BadRequest("Unknown AllergyId.");
 
-        var alreadyExists = await _db.UserAllergies.AnyAsync(x =>
-            x.UserId == user.UserId && x.AllergyId == request.AllergyId);
+        var existingLink = await _db.UserAllergies
+            .FirstOrDefaultAsync(x =>
+                x.UserId == user.UserId && x.AllergyId == request.AllergyId);
 
-        if (alreadyExists)
+        if (existingLink is not null)
+        {
+            existingLink.Notes = request.Notes?.Trim() ?? string.Empty;
+            await _db.SaveChangesAsync();
             return NoContent();
+        }
 
         _db.UserAllergies.Add(new UserAllergy
         {
