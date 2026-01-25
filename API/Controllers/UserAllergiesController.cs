@@ -1,21 +1,20 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
+using Application.Users.Allergies.Dtos;
 using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
-using Application.Users.Allergies.Dtos;
-
-
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers;
 
 [ApiController]
-public class UserAllergiesController : ControllerBase
+[Route("users/{id:guid}/allergies")]
+public sealed class UserAllergiesController : ControllerBase
 {
     private readonly IApplicationDBContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
-
 
     public UserAllergiesController(IApplicationDBContext db, UserManager<ApplicationUser> userManager)
     {
@@ -23,15 +22,73 @@ public class UserAllergiesController : ControllerBase
         _userManager = userManager;
     }
 
+    // Helper: map Identity userId (AspNetUsers.Id) -> Domain User (dbo.User.UserId)
+    private async Task<User?> GetOrCreateDomainUserAsync(Guid identityUserId, CancellationToken ct)
+    {
+        // 1) Identity user must exist
+        var identityUser = await _userManager.FindByIdAsync(identityUserId.ToString());
+        if (identityUser is null) return null;
+
+        // 2) Try find domain user profile by IdentityUserId
+        var domainUser = await _db.Users
+            .FirstOrDefaultAsync(u => u.IdentityUserId == identityUserId.ToString(), ct);
+
+        if (domainUser is not null) return domainUser;
+
+        // 3) Create domain user profile (minimal defaults)
+        var schoolId = await _db.Schools
+            .Select(s => s.SchoolId)
+            .FirstOrDefaultAsync(ct);
+
+        if (schoolId == Guid.Empty)
+            return null; // no school seeded/created yet
+
+        domainUser = new User
+        {
+            UserId = Guid.NewGuid(),
+            IdentityUserId = identityUserId.ToString(),
+            SchoolId = schoolId,
+            Role = Role.User,
+            DisplayName = identityUser.Email ?? "User",
+            ClassGroup = string.Empty,
+            DefaultVegetarian = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Users.Add(domainUser);
+        await _db.SaveChangesAsync(ct);
+
+        return domainUser;
+    }
+
+    // GET /users/{id}/allergies
+    [HttpGet]
+    public async Task<IActionResult> GetAllergies([FromRoute] Guid id, CancellationToken ct)
+    {
+        var domainUser = await GetOrCreateDomainUserAsync(id, ct);
+        if (domainUser is null)
+            return NotFound(new { message = "User profile not found (missing identity user or school)." });
+
+        var allergies = await _db.UserAllergies
+            .Where(ua => ua.UserId == domainUser.UserId)
+            .Join(_db.Allergies,
+                ua => ua.AllergyId,
+                a => a.AllergyId,
+                (ua, a) => new
+                {
+                    a.AllergyId,
+                    a.Name,
+                    ua.Notes
+                })
+            .OrderBy(x => x.Name)
+            .ToListAsync(ct);
+
+        return Ok(allergies);
+    }
 
     // POST /users/{id}/allergies
-    // Adds a link between a user and an allergy.
     [HttpPost]
-    [Route("users/{id:guid}/allergies")]
-    public async Task<IActionResult> AddAllergy(
-        [FromRoute] Guid id,
-        [FromBody] AddUserAllergyRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> AddAllergy([FromRoute] Guid id, [FromBody] AddUserAllergyRequest request, CancellationToken ct)
     {
         if (request is null)
             return BadRequest(new { message = "Request body is required." });
@@ -39,93 +96,52 @@ public class UserAllergiesController : ControllerBase
         if (request.AllergyId == Guid.Empty)
             return BadRequest(new { message = "AllergyId is required." });
 
-        bool userExists = await _userManager.Users.AnyAsync(u => u.Id == id, cancellationToken);
-        if (!userExists)
-            return NotFound(new { message = "User not found." });
+        var domainUser = await GetOrCreateDomainUserAsync(id, ct);
+        if (domainUser is null)
+            return NotFound(new { message = "User profile not found (missing identity user or school)." });
 
-        bool allergyExists = await _db.Allergies.AnyAsync(allergyEntity => allergyEntity.AllergyId == request.AllergyId, cancellationToken);
+        var allergyExists = await _db.Allergies.AnyAsync(a => a.AllergyId == request.AllergyId, ct);
         if (!allergyExists)
             return NotFound(new { message = "Allergy not found." });
 
-        var existingLink = await _db.UserAllergies
-            .FirstOrDefaultAsync(linkEntity =>
-                linkEntity.UserId == id && linkEntity.AllergyId == request.AllergyId, cancellationToken);
+        var existing = await _db.UserAllergies
+            .FirstOrDefaultAsync(ua => ua.UserId == domainUser.UserId && ua.AllergyId == request.AllergyId, ct);
 
-        if (existingLink is not null)
+        if (existing is not null)
         {
-            existingLink.Notes = request.Notes?.Trim() ?? string.Empty;
-            await _db.SaveChangesAsync(cancellationToken);
+            existing.Notes = request.Notes?.Trim() ?? string.Empty;
+            await _db.SaveChangesAsync(ct);
             return NoContent();
         }
 
-        var newLink = new UserAllergy
+        _db.UserAllergies.Add(new UserAllergy
         {
-            UserId = id,
+            UserId = domainUser.UserId,
             AllergyId = request.AllergyId,
             Notes = request.Notes?.Trim() ?? string.Empty
-        };
+        });
 
-        _db.UserAllergies.Add(newLink);
-        await _db.SaveChangesAsync(cancellationToken);
-
+        await _db.SaveChangesAsync(ct);
         return NoContent();
     }
 
     // DELETE /users/{id}/allergies/{allergyId}
-    // Removes the link between a user and an allergy.
-    [HttpDelete]
-    [Route("users/{id:guid}/allergies/{allergyId:guid}")]
-    public async Task<IActionResult> RemoveAllergy(
-        [FromRoute] Guid id,
-        [FromRoute] Guid allergyId,
-        CancellationToken cancellationToken)
+    [HttpDelete("{allergyId:guid}")]
+    public async Task<IActionResult> RemoveAllergy([FromRoute] Guid id, [FromRoute] Guid allergyId, CancellationToken ct)
     {
-        bool userExists = await _userManager.Users.AnyAsync(u => u.Id == id, cancellationToken);
-        if (!userExists)
-            return NotFound(new { message = "User not found." });
-
-        bool allergyExists = await _db.Allergies.AnyAsync(allergyEntity => allergyEntity.AllergyId == allergyId, cancellationToken);
-        if (!allergyExists)
-            return NotFound(new { message = "Allergy not found." });
+        var domainUser = await GetOrCreateDomainUserAsync(id, ct);
+        if (domainUser is null)
+            return NotFound(new { message = "User profile not found (missing identity user or school)." });
 
         var link = await _db.UserAllergies
-            .FirstOrDefaultAsync(linkEntity => linkEntity.UserId == id && linkEntity.AllergyId == allergyId, cancellationToken);
+            .FirstOrDefaultAsync(ua => ua.UserId == domainUser.UserId && ua.AllergyId == allergyId, ct);
 
         if (link is null)
             return NotFound(new { message = "User does not have this allergy." });
 
         _db.UserAllergies.Remove(link);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _db.SaveChangesAsync(ct);
 
         return NoContent();
-    }
-
-    // GET /users/{id}/allergies
-    // Returns all allergies for a user.
-    [HttpGet]
-    [Route("users/{id:guid}/allergies")]
-    public async Task<IActionResult> GetAllergies(
-        [FromRoute] Guid id,
-        CancellationToken cancellationToken)
-    {
-        bool userExists = await _userManager.Users.AnyAsync(u => u.Id == id, cancellationToken);
-        if (!userExists)
-            return NotFound(new { message = "User not found." });
-
-        var allergies = await _db.UserAllergies
-            .Where(linkEntity => linkEntity.UserId == id)
-            .Join(_db.Allergies,
-                linkEntity => linkEntity.AllergyId,
-                allergyEntity => allergyEntity.AllergyId,
-                (linkEntity, allergyEntity) => new
-                {
-                    allergyEntity.AllergyId,
-                    allergyEntity.Name,
-                    linkEntity.Notes
-                })
-            .OrderBy(result => result.Name)
-            .ToListAsync(cancellationToken);
-
-        return Ok(allergies);
     }
 }

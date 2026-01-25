@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace API.Controllers;
 
 [ApiController]
-[Authorize(Policy = "AdminOnly")]
+[Route("users")]
 
 public class UsersController : ControllerBase
 {
@@ -29,8 +29,8 @@ public class UsersController : ControllerBase
 
     // GET /users/{id}
     // Returns a single identity user by id.
-    [HttpGet]
-    [Route("users/{id:guid}")]
+    [HttpGet("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GetById(
         [FromRoute] Guid id,
         CancellationToken ct)
@@ -51,8 +51,7 @@ public class UsersController : ControllerBase
     // TEMPORARY: Identity users currently do not have SchoolId.
     // This returns all identity users until we add SchoolId to ApplicationUser
     // or introduce a UserProfile mapping.
-    [HttpGet]
-    [Route("schools/{schoolId:guid}/users")]
+    [HttpGet("/schools/{schoolId:guid}/users")]
     public async Task<IActionResult> GetBySchool(
         [FromRoute] Guid schoolId,
         CancellationToken ct)
@@ -71,8 +70,8 @@ public class UsersController : ControllerBase
 
     // PUT /users/{id}
     // Updates basic identity fields.
-    [HttpPut]
-    [Route("users/{id:guid}")]
+
+    [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateUserRequest request,
@@ -97,8 +96,7 @@ public class UsersController : ControllerBase
 
     // DELETE /users/{id}
     // Deletes an identity user.
-    [HttpDelete]
-    [Route("users/{id:guid}")]
+    [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         [FromRoute] Guid id,
         CancellationToken ct)
