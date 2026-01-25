@@ -24,6 +24,7 @@ public class AuthController : ControllerBase
     }
 
     // POST /auth/register
+    // POST /auth/register
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
@@ -40,10 +41,15 @@ public class AuthController : ControllerBase
         var result = await _userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
             return BadRequest(result.Errors);
-        // Tilldela default-roll
-        await _userManager.AddToRoleAsync(user, "STUDENT");
+
+        // ✅ Assign default role to new users
+        var roleResult = await _userManager.AddToRoleAsync(user, "STUDENT");
+        if (!roleResult.Succeeded)
+            return BadRequest(roleResult.Errors);
+
         return Created($"/users/{user.Id}", new { UserId = user.Id, user.Email });
     }
+
 
     public sealed record RegisterRequest(string Email, string Password);
 
