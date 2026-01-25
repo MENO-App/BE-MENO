@@ -47,17 +47,22 @@ public class UserAllergiesController : ControllerBase
         if (!allergyExists)
             return NotFound(new { message = "Allergy not found." });
 
-        bool linkExists = await _db.UserAllergies.AnyAsync(linkEntity =>
-            linkEntity.UserId == id && linkEntity.AllergyId == request.AllergyId, cancellationToken);
+        var existingLink = await _db.UserAllergies
+            .FirstOrDefaultAsync(linkEntity =>
+                linkEntity.UserId == id && linkEntity.AllergyId == request.AllergyId, cancellationToken);
 
-        if (linkExists)
-            return Conflict(new { message = "User already has this allergy." });
+        if (existingLink is not null)
+        {
+            existingLink.Notes = request.Notes?.Trim() ?? string.Empty;
+            await _db.SaveChangesAsync(cancellationToken);
+            return NoContent();
+        }
 
         var newLink = new UserAllergy
         {
             UserId = id,
             AllergyId = request.AllergyId,
-            Notes = request.Notes
+            Notes = request.Notes?.Trim() ?? string.Empty
         };
 
         _db.UserAllergies.Add(newLink);

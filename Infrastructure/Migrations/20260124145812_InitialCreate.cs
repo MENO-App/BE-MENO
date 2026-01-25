@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
@@ -16,7 +18,7 @@ namespace Infrastructure.Migrations
                 columns: table => new
                 {
                     AllergyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -63,6 +65,20 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "MealPlans",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Date = table.Column<DateOnly>(type: "date", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    WantsVegetarian = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MealPlans", x => new { x.UserId, x.Date });
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Schools",
                 columns: table => new
                 {
@@ -73,6 +89,25 @@ namespace Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Schools", x => x.SchoolId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserAllergies",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    AllergyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserAllergies", x => new { x.UserId, x.AllergyId });
+                    table.ForeignKey(
+                        name: "FK_UserAllergies_Allergies_AllergyId",
+                        column: x => x.AllergyId,
+                        principalTable: "Allergies",
+                        principalColumn: "AllergyId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -207,6 +242,7 @@ namespace Infrastructure.Migrations
                 columns: table => new
                 {
                     UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IdentityUserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     SchoolId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Role = table.Column<int>(type: "int", nullable: false),
                     DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -248,51 +284,6 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "MealPlans",
-                columns: table => new
-                {
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Date = table.Column<DateOnly>(type: "date", nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    WantsVegetarian = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_MealPlans", x => new { x.UserId, x.Date });
-                    table.ForeignKey(
-                        name: "FK_MealPlans_User_UserId",
-                        column: x => x.UserId,
-                        principalTable: "User",
-                        principalColumn: "UserId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserAllergies",
-                columns: table => new
-                {
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    AllergyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserAllergies", x => new { x.UserId, x.AllergyId });
-                    table.ForeignKey(
-                        name: "FK_UserAllergies_Allergies_AllergyId",
-                        column: x => x.AllergyId,
-                        principalTable: "Allergies",
-                        principalColumn: "AllergyId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_UserAllergies_User_UserId",
-                        column: x => x.UserId,
-                        principalTable: "User",
-                        principalColumn: "UserId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "MenuItemAllergens",
                 columns: table => new
                 {
@@ -308,6 +299,24 @@ namespace Infrastructure.Migrations
                         principalTable: "MenuItems",
                         principalColumn: "MenuItemId",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                table: "Allergies",
+                columns: new[] { "AllergyId", "Name" },
+                values: new object[,]
+                {
+                    { new Guid("11111111-1111-1111-1111-111111111111"), "Gluten" },
+                    { new Guid("22222222-2222-2222-2222-222222222222"), "Laktos" },
+                    { new Guid("33333333-3333-3333-3333-333333333333"), "Mjölkprotein" },
+                    { new Guid("44444444-4444-4444-4444-444444444444"), "Ägg" },
+                    { new Guid("55555555-5555-5555-5555-555555555555"), "Nötter" },
+                    { new Guid("66666666-6666-6666-6666-666666666666"), "Jordnötter" },
+                    { new Guid("77777777-7777-7777-7777-777777777777"), "Soja" },
+                    { new Guid("88888888-8888-8888-8888-888888888888"), "Fisk" },
+                    { new Guid("99999999-9999-9999-9999-999999999999"), "Skaldjur" },
+                    { new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "Sesam" },
+                    { new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), "Annan" }
                 });
 
             migrationBuilder.CreateIndex(
@@ -395,6 +404,9 @@ namespace Infrastructure.Migrations
                 name: "MenuItemAllergens");
 
             migrationBuilder.DropTable(
+                name: "User");
+
+            migrationBuilder.DropTable(
                 name: "UserAllergies");
 
             migrationBuilder.DropTable(
@@ -408,9 +420,6 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Allergies");
-
-            migrationBuilder.DropTable(
-                name: "User");
 
             migrationBuilder.DropTable(
                 name: "MenuWeeks");
