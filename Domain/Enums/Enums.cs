@@ -8,10 +8,11 @@ namespace Domain.Enums
 {
     public enum Role
     {
-        Student = 0,
-        Staff = 1,
+        //Student = 0,
+        //Staff = 1,
         Kitchen = 2,
-        Admin = 3
+        Admin = 3,
+        User = 4
     }
 
     public enum MealChoiceStatus

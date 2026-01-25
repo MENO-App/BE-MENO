@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260120145242_AddIdentityTables")]
-    partial class AddIdentityTables
+    [Migration("20260123233628_SeedAllergies")]
+    partial class SeedAllergies
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -38,6 +38,68 @@ namespace Infrastructure.Migrations
                     b.HasKey("AllergyId");
 
                     b.ToTable("Allergies");
+
+                    b.HasData(
+                        new
+                        {
+                            AllergyId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            Name = "Gluten"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            Name = "Laktos"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("33333333-3333-3333-3333-333333333333"),
+                            Name = "Mjölkprotein"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("44444444-4444-4444-4444-444444444444"),
+                            Name = "Ägg"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("55555555-5555-5555-5555-555555555555"),
+                            Name = "Fisk"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("66666666-6666-6666-6666-666666666666"),
+                            Name = "Skaldjur"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("77777777-7777-7777-7777-777777777777"),
+                            Name = "Jordnötter"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("88888888-8888-8888-8888-888888888888"),
+                            Name = "Nötter"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("99999999-9999-9999-9999-999999999999"),
+                            Name = "Soja"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                            Name = "Sesam"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                            Name = "Selleri"
+                        },
+                        new
+                        {
+                            AllergyId = new Guid("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                            Name = "Senap"
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.MealPlan", b =>
@@ -166,6 +228,10 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("IdentityUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
@@ -176,7 +242,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("SchoolId");
 
-                    b.ToTable("User");
+                    b.ToTable("User", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.UserAllergy", b =>
