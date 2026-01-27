@@ -59,14 +59,10 @@ Projektet hjälper skolor att:
 - **React** (t.ex. Vite)
 - React Router
 - Axios/Fetch
-- (Valfritt) UI-lib: MUI / Tailwind / Chakra
+- 
 
 ### Database
 - SQL Server (LocalDB / SQLExpress i dev)
 
----
 
-## Repo-struktur
-
-Exempel (rekommenderat):
 
