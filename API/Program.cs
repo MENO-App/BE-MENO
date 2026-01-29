@@ -7,11 +7,8 @@ using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Identity;
-
 using Infrastructure.Repositories;
-
 using MediatR;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -126,6 +123,8 @@ public class Program
         builder.Services.AddValidatorsFromAssembly(typeof(Application.Common.Result).Assembly);
 
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Application.Common.ValidationBehavior<,>));
+        builder.Services.AddTransient<API.Middleware.GlobalExceptionMiddleware>();
+
         // -------------------------
         // Controllers + Swagger
         // -------------------------
@@ -213,6 +212,8 @@ public class Program
             app.UseSwagger();
             app.UseSwaggerUI();
         }
+
+        app.UseMiddleware<API.Middleware.GlobalExceptionMiddleware>();
 
         app.UseHttpsRedirection();
         app.UseRouting();

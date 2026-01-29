@@ -42,7 +42,7 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return BadRequest(result.Errors);
 
-        // ✅ Assign default role to new users
+        //  Assign default role to new users
         var roleResult = await _userManager.AddToRoleAsync(user, "STUDENT");
         if (!roleResult.Succeeded)
             return BadRequest(roleResult.Errors);
@@ -50,7 +50,7 @@ public class AuthController : ControllerBase
         return Created($"/users/{user.Id}", new { UserId = user.Id, user.Email });
     }
 
-
+    // DTO for user registration request (immutable record)
     public sealed record RegisterRequest(string Email, string Password);
 
     // POST /auth/login

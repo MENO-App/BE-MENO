@@ -1,4 +1,5 @@
-﻿using Application.Common.Interfaces;
+﻿using Application.Common.Exceptions;
+using Application.Common.Interfaces;
 using Application.Users.Allergies.Dtos;
 using Domain.Entities;
 using Domain.Enums;
@@ -67,7 +68,7 @@ public sealed class UserAllergiesController : ControllerBase
     {
         var domainUser = await GetOrCreateDomainUserAsync(id, ct);
         if (domainUser is null)
-            return NotFound(new { message = "User profile not found (missing identity user or school)." });
+            throw new NotFoundException("User profile not found (missing identity user or school).");
 
         var allergies = await _db.UserAllergies
             .Where(ua => ua.UserId == domainUser.UserId)
@@ -88,24 +89,31 @@ public sealed class UserAllergiesController : ControllerBase
 
     // POST /users/{id}/allergies
     [HttpPost]
-    public async Task<IActionResult> AddAllergy([FromRoute] Guid id, [FromBody] AddUserAllergyRequest request, CancellationToken ct)
+    public async Task<IActionResult> AddAllergy(
+        [FromRoute] Guid id,
+        [FromBody] AddUserAllergyRequest request,
+        CancellationToken ct)
     {
         if (request is null)
-            return BadRequest(new { message = "Request body is required." });
+            throw new BadRequestException("Request body is required.");
 
         if (request.AllergyId == Guid.Empty)
-            return BadRequest(new { message = "AllergyId is required." });
+            throw new BadRequestException("AllergyId is required.");
 
         var domainUser = await GetOrCreateDomainUserAsync(id, ct);
         if (domainUser is null)
-            return NotFound(new { message = "User profile not found (missing identity user or school)." });
+            throw new NotFoundException("User profile not found (missing identity user or school).");
 
-        var allergyExists = await _db.Allergies.AnyAsync(a => a.AllergyId == request.AllergyId, ct);
+        var allergyExists = await _db.Allergies
+            .AnyAsync(a => a.AllergyId == request.AllergyId, ct);
+
         if (!allergyExists)
-            return NotFound(new { message = "Allergy not found." });
+            throw new NotFoundException("Allergy not found.");
 
         var existing = await _db.UserAllergies
-            .FirstOrDefaultAsync(ua => ua.UserId == domainUser.UserId && ua.AllergyId == request.AllergyId, ct);
+            .FirstOrDefaultAsync(
+                ua => ua.UserId == domainUser.UserId && ua.AllergyId == request.AllergyId,
+                ct);
 
         if (existing is not null)
         {
@@ -127,17 +135,22 @@ public sealed class UserAllergiesController : ControllerBase
 
     // DELETE /users/{id}/allergies/{allergyId}
     [HttpDelete("{allergyId:guid}")]
-    public async Task<IActionResult> RemoveAllergy([FromRoute] Guid id, [FromRoute] Guid allergyId, CancellationToken ct)
+    public async Task<IActionResult> RemoveAllergy(
+        [FromRoute] Guid id,
+        [FromRoute] Guid allergyId,
+        CancellationToken ct)
     {
         var domainUser = await GetOrCreateDomainUserAsync(id, ct);
         if (domainUser is null)
-            return NotFound(new { message = "User profile not found (missing identity user or school)." });
+            throw new NotFoundException("User profile not found (missing identity user or school).");
 
         var link = await _db.UserAllergies
-            .FirstOrDefaultAsync(ua => ua.UserId == domainUser.UserId && ua.AllergyId == allergyId, ct);
+            .FirstOrDefaultAsync(
+                ua => ua.UserId == domainUser.UserId && ua.AllergyId == allergyId,
+                ct);
 
         if (link is null)
-            return NotFound(new { message = "User does not have this allergy." });
+            throw new NotFoundException("User does not have this allergy.");
 
         _db.UserAllergies.Remove(link);
         await _db.SaveChangesAsync(ct);
